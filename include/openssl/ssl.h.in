@@ -1691,6 +1691,9 @@ __owur long SSL_SESSION_set_timeout(SSL_SESSION *s, long t);
 __owur int SSL_SESSION_get_protocol_version(const SSL_SESSION *s);
 __owur int SSL_SESSION_set_protocol_version(SSL_SESSION *s, int version);
 
+__owur time_t SSL_SESSION_get_time_ex(const SSL_SESSION *s);
+__owur time_t SSL_SESSION_set_time_ex(SSL_SESSION *s, time_t t);
+
 __owur const char *SSL_SESSION_get0_hostname(const SSL_SESSION *s);
 __owur int SSL_SESSION_set1_hostname(SSL_SESSION *s, const char *hostname);
 void SSL_SESSION_get0_alpn_selected(const SSL_SESSION *s,
@@ -2378,6 +2381,11 @@ __owur int SSL_get_conn_close_info(SSL *ssl,
 # define SSL_VALUE_QUIC_STREAM_UNI_LOCAL_AVAIL      3
 # define SSL_VALUE_QUIC_STREAM_UNI_REMOTE_AVAIL     4
 # define SSL_VALUE_QUIC_IDLE_TIMEOUT                5
+# define SSL_VALUE_EVENT_HANDLING_MODE              6
+
+# define SSL_VALUE_EVENT_HANDLING_MODE_INHERIT      0
+# define SSL_VALUE_EVENT_HANDLING_MODE_IMPLICIT     1
+# define SSL_VALUE_EVENT_HANDLING_MODE_EXPLICIT     2
 
 int SSL_get_value_uint(SSL *s, uint32_t class_, uint32_t id, uint64_t *v);
 int SSL_set_value_uint(SSL *s, uint32_t class_, uint32_t id, uint64_t v);
@@ -2406,6 +2414,13 @@ int SSL_set_value_uint(SSL *s, uint32_t class_, uint32_t id, uint64_t v);
                                (value))
 # define SSL_get_quic_stream_uni_remote_avail(ssl, value) \
     SSL_get_generic_value_uint((ssl), SSL_VALUE_QUIC_STREAM_UNI_REMOTE_AVAIL, \
+                               (value))
+
+# define SSL_get_event_handling_mode(ssl, value) \
+    SSL_get_generic_value_uint((ssl), SSL_VALUE_EVENT_HANDLING_MODE, \
+                               (value))
+# define SSL_set_event_handling_mode(ssl, value) \
+    SSL_set_generic_value_uint((ssl), SSL_VALUE_EVENT_HANDLING_MODE, \
                                (value))
 
 # define SSL_POLL_EVENT_NONE        0
