@@ -111,6 +111,7 @@ static int rwwriter2_iterations = 0;
 static int *rwwriter_ptr = NULL;
 static int rw_torture_result = 1;
 static CRYPTO_RWLOCK *rwtorturelock = NULL;
+static CRYPTO_RWLOCK *atomiclock = NULL;
 
 static void rwwriter_fn(int id, int *iterations)
 {
@@ -150,7 +151,7 @@ static void rwwriter1_fn(void)
 
     TEST_info("Starting writer1");
     rwwriter_fn(1, &rwwriter1_iterations);
-    CRYPTO_atomic_add(&rwwriter1_done, 1, &local, NULL);
+    CRYPTO_atomic_add(&rwwriter1_done, 1, &local, atomiclock);
 }
 
 static void rwwriter2_fn(void)
@@ -159,7 +160,7 @@ static void rwwriter2_fn(void)
 
     TEST_info("Starting writer 2");
     rwwriter_fn(2, &rwwriter2_iterations);
-    CRYPTO_atomic_add(&rwwriter2_done, 1, &local, NULL);
+    CRYPTO_atomic_add(&rwwriter2_done, 1, &local, atomiclock);
 }
 
 static void rwreader_fn(int *iterations)
@@ -174,8 +175,8 @@ static void rwreader_fn(int *iterations)
             abort();
 
     while (lw1 != 1 || lw2 != 1) {
-        CRYPTO_atomic_add(&rwwriter1_done, 0, &lw1, NULL);
-        CRYPTO_atomic_add(&rwwriter2_done, 0, &lw2, NULL);
+        CRYPTO_atomic_add(&rwwriter1_done, 0, &lw1, atomiclock);
+        CRYPTO_atomic_add(&rwwriter2_done, 0, &lw2, atomiclock);
 
         count++;
         if (rwwriter_ptr != NULL && old > *rwwriter_ptr) {
@@ -223,6 +224,7 @@ static int _torture_rw(void)
     struct timeval dtime;
 
     rwtorturelock = CRYPTO_THREAD_lock_new();
+    atomiclock = CRYPTO_THREAD_lock_new();
     rwwriter1_iterations = 0;
     rwwriter2_iterations = 0;
     rwreader1_iterations = 0;
@@ -264,6 +266,7 @@ static int _torture_rw(void)
         ret = 1;
 out:
     CRYPTO_THREAD_lock_free(rwtorturelock);
+    CRYPTO_THREAD_lock_free(atomiclock);
     rwtorturelock = NULL;
     return ret;
 }
@@ -281,6 +284,7 @@ static int torture_rw_high(void)
 }
 
 
+# ifndef OPENSSL_SYS_MACOSX 
 static CRYPTO_RCU_LOCK *rcu_lock = NULL;
 
 static int writer1_done = 0;
@@ -289,10 +293,9 @@ static int reader1_iterations = 0;
 static int reader2_iterations = 0;
 static int writer1_iterations = 0;
 static int writer2_iterations = 0;
-static unsigned int *writer_ptr = NULL;
-static unsigned int global_ctr = 0;
+static uint64_t *writer_ptr = NULL;
+static uint64_t global_ctr = 0;
 static int rcu_torture_result = 1;
-
 static void free_old_rcu_data(void *data)
 {
     CRYPTO_free(data, NULL, 0);
@@ -302,12 +305,12 @@ static void writer_fn(int id, int *iterations)
 {
     int count;
     OSSL_TIME t1, t2;
-    unsigned int *old, *new;
+    uint64_t *old, *new;
 
     t1 = ossl_time_now();
 
     for (count = 0; ; count++) {
-        new = CRYPTO_zalloc(sizeof(int), NULL, 0);
+        new = CRYPTO_zalloc(sizeof(uint64_t), NULL, 0);
         if (contention == 0)
             OSSL_sleep(1000);
         ossl_rcu_write_lock(rcu_lock);
@@ -336,7 +339,7 @@ static void writer1_fn(void)
 
     TEST_info("Starting writer1");
     writer_fn(1, &writer1_iterations);
-    CRYPTO_atomic_add(&writer1_done, 1, &local, NULL);
+    CRYPTO_atomic_add(&writer1_done, 1, &local, atomiclock);
 }
 
 static void writer2_fn(void)
@@ -345,27 +348,28 @@ static void writer2_fn(void)
 
     TEST_info("Starting writer2");
     writer_fn(2, &writer2_iterations);
-    CRYPTO_atomic_add(&writer2_done, 1, &local, NULL);
+    CRYPTO_atomic_add(&writer2_done, 1, &local, atomiclock);
 }
 
 static void reader_fn(int *iterations)
 {
     unsigned int count = 0;
-    unsigned int *valp;
-    unsigned int val;
-    unsigned int oldval = 0;
+    uint64_t *valp;
+    uint64_t val;
+    uint64_t oldval = 0;
     int lw1 = 0;
     int lw2 = 0;
 
     while (lw1 != 1 || lw2 != 1) {
-        CRYPTO_atomic_add(&writer1_done, 0, &lw1, NULL);
-        CRYPTO_atomic_add(&writer2_done, 0, &lw2, NULL);
+        CRYPTO_atomic_add(&writer1_done, 0, &lw1, atomiclock);
+        CRYPTO_atomic_add(&writer2_done, 0, &lw2, atomiclock);
         count++;
         ossl_rcu_read_lock(rcu_lock);
         valp = ossl_rcu_deref(&writer_ptr);
         val = (valp == NULL) ? 0 : *valp;
+
         if (oldval > val) {
-            TEST_info("rcu torture value went backwards! (%p) %x : %x\n", (void *)valp, oldval, val);
+            TEST_info("rcu torture value went backwards! %llu : %llu", (unsigned long long)oldval, (unsigned long long)val);
             rcu_torture_result = 0;
         }
         oldval = val; /* just try to deref the pointer */
@@ -402,6 +406,7 @@ static int _torture_rcu(void)
     double tottime;
     double avr, avw;
 
+    atomiclock = CRYPTO_THREAD_lock_new();
     memset(&writer1, 0, sizeof(thread_t));
     memset(&writer2, 0, sizeof(thread_t));
     memset(&reader1, 0, sizeof(thread_t));
@@ -442,6 +447,7 @@ static int _torture_rcu(void)
     TEST_info("Average write time %e/write", avw);
 
     ossl_rcu_lock_free(rcu_lock);
+    CRYPTO_THREAD_lock_free(atomiclock);
     if (!TEST_int_eq(rcu_torture_result, 1))
         return 0;
 
@@ -459,6 +465,7 @@ static int torture_rcu_high(void)
     contention = 1;
     return _torture_rcu();
 }
+# endif
 #endif
 
 static CRYPTO_ONCE once_run = CRYPTO_ONCE_STATIC_INIT;
@@ -1223,8 +1230,10 @@ int setup_tests(void)
 #if defined(OPENSSL_THREADS)
     ADD_TEST(torture_rw_low);
     ADD_TEST(torture_rw_high);
+# ifndef OPENSSL_SYS_MACOSX
     ADD_TEST(torture_rcu_low);
     ADD_TEST(torture_rcu_high);
+# endif
 #endif
     ADD_TEST(test_once);
     ADD_TEST(test_thread_local);

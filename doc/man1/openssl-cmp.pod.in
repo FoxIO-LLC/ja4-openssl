@@ -116,6 +116,7 @@ Client-side debugging options:
 [B<-reqin> I<filenames>]
 [B<-reqin_new_tid>]
 [B<-reqout> I<filenames>]
+[B<-reqout_only> I<filename>]
 [B<-rspin> I<filenames>]
 [B<-rspout> I<filenames>]
 [B<-use_mock_srv>]
@@ -968,7 +969,7 @@ If not given it defaults to the B<-server> address.
 
 =back
 
-=head2 Client-side debugging options
+=head2 Client-side options for debugging and offline scenarios
 
 =over 4
 
@@ -987,8 +988,28 @@ Default is one invocation.
 Take the sequence of CMP requests to send to the server from the given file(s)
 rather than from the sequence of requests produced internally.
 
+This option is useful for supporting offline scenarios where the certificate
+request (or any other CMP request) is produced beforehand and sent out later.
+
 This option is ignored if the B<-rspin> option is given
 because in the latter case no requests are actually sent.
+
+Note that in any case the client produces internally its sequence
+of CMP request messages. Thus, all options required for doing this
+(such as B<-cmd> and all options providing the required parameters)
+need to be given also when the B<-reqin> option is present.
+
+If the B<-reqin> option is given for a certificate request
+and no B<-newkey>, B<-key>, B<-oldcert>, or B<-csr> option is given,
+a fallback public key is taken from the request message file
+(if it is included in the certificate template).
+
+Hint: In case the B<-reqin> option is given for a certificate request, there are
+situations where the client has access to the public key to be certified but
+not to the private key that by default will be needed for proof of possession.
+In this case the POPO is not actually needed (because the internally produced
+certificate request message will not be sent), and its generation
+can be disabled using the options B<-popo> I<-1> or B<-popo> I<0>.
 
 Multiple filenames may be given, separated by commas and/or whitespace
 (where in the latter case the whole argument must be enclosed in "...").
@@ -1019,6 +1040,14 @@ Multiple filenames may be given, separated by commas and/or whitespace.
 Files are written as far as needed to save the transaction
 and filenames have been provided.
 If the transaction contains more requests, the remaining ones are not saved.
+
+=item B<-reqout_only> I<filename>
+
+Save the first CMP requests created by the client to the given file and exit.
+Any options related to CMP servers and their reponses are ignored.
+
+This option is useful for supporting offline scenarios where the certificate
+request (or any other CMP request) is produced beforehand and sent out later.
 
 =item B<-rspin> I<filenames>
 

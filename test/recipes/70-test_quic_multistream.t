@@ -9,7 +9,7 @@
 use OpenSSL::Test qw/:DEFAULT srctop_file result_dir data_file/;
 use OpenSSL::Test::Utils;
 use File::Temp qw(tempfile);
-use File::Path 2.00 qw(rmtree);
+use File::Path 2.00 qw(rmtree mkpath);
 
 setup("test_quic_multistream");
 
@@ -18,8 +18,9 @@ plan skip_all => "QUIC protocol is not supported by this OpenSSL build"
 
 plan tests => 2;
 
-if (!disabled('qlog') && $ENV{OSSL_RUN_CI_TESTS} == "1") {
-    my $qlog_output = result_dir("qlog-output");
+my $qlog_output;
+if (!disabled('qlog')) {
+    $qlog_output = result_dir("qlog-output");
     print "# Writing qlog output to $qlog_output\n";
     rmtree($qlog_output, { safe => 1 });
     mkdir($qlog_output);

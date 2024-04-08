@@ -49,6 +49,11 @@ int qtest_create_quic_objects(OSSL_LIB_CTX *libctx, SSL_CTX *clientctx,
 /* Where QTEST_FLAG_FAKE_TIME is used, add millis to the current time */
 void qtest_add_time(uint64_t millis);
 
+/* Starts time measurement */
+void qtest_start_stopwatch(void);
+/* Returns the duration from the start in millis */
+uint64_t qtest_get_stopwatch_time(void);
+
 QTEST_FAULT *qtest_create_injector(QUIC_TSERVER *ts);
 
 BIO_METHOD *qtest_get_bio_method(void);
@@ -244,10 +249,28 @@ int qtest_fault_set_datagram_listener(QTEST_FAULT *fault,
  */
 int qtest_fault_resize_datagram(QTEST_FAULT *fault, size_t newlen);
 
+/*
+ * Set bandwidth and noise rate on noisy dgram filter.
+ * Arguments with values of 0 mean no limit/no noise.
+ */
+
+int qtest_fault_set_bw_limit(QTEST_FAULT *fault,
+                             size_t ctos_bw, size_t stoc_bw,
+                             int noise_rate);
+
 /* Copy a BIO_MSG */
 int bio_msg_copy(BIO_MSG *dst, BIO_MSG *src);
 
-#define BIO_CTRL_NOISE_BACK_OFF 1001
+#define BIO_CTRL_NOISE_BACK_OFF       1001
+#define BIO_CTRL_NOISE_RATE           1002
+#define BIO_CTRL_NOISE_RECV_BANDWIDTH 1003
+#define BIO_CTRL_NOISE_SEND_BANDWIDTH 1004
+#define BIO_CTRL_NOISE_SET_NOW_CB     1005
+
+struct bio_noise_now_cb_st {
+    OSSL_TIME (*now_cb)(void *);
+    void *now_cb_arg;
+};
 
 /* BIO filter for simulating a noisy UDP socket */
 const BIO_METHOD *bio_f_noisy_dgram_filter(void);

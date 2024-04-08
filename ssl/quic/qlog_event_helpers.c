@@ -78,40 +78,40 @@ void ossl_qlog_event_connectivity_connection_state_updated(QLOG *qlog,
 static const char *quic_err_to_qlog(uint64_t error_code)
 {
     switch (error_code) {
-        case QUIC_ERR_INTERNAL_ERROR:
-            return "internal_error";
-        case QUIC_ERR_CONNECTION_REFUSED:
-            return "connection_refused";
-        case QUIC_ERR_FLOW_CONTROL_ERROR:
-            return "flow_control_error";
-        case QUIC_ERR_STREAM_LIMIT_ERROR:
-            return "stream_limit_error";
-        case QUIC_ERR_STREAM_STATE_ERROR:
-            return "stream_state_error";
-        case QUIC_ERR_FINAL_SIZE_ERROR:
-            return "final_size_error";
-        case QUIC_ERR_FRAME_ENCODING_ERROR:
-            return "frame_encoding_error";
-        case QUIC_ERR_TRANSPORT_PARAMETER_ERROR:
-            return "transport_parameter_error";
-        case QUIC_ERR_CONNECTION_ID_LIMIT_ERROR:
-            return "connection_id_limit_error";
-        case QUIC_ERR_PROTOCOL_VIOLATION:
-            return "protocol_violation";
-        case QUIC_ERR_INVALID_TOKEN:
-            return "invalid_token";
-        case QUIC_ERR_APPLICATION_ERROR:
-            return "application_error";
-        case QUIC_ERR_CRYPTO_BUFFER_EXCEEDED:
-            return "crypto_buffer_exceeded";
-        case QUIC_ERR_KEY_UPDATE_ERROR:
-            return "key_update_error";
-        case QUIC_ERR_AEAD_LIMIT_REACHED:
-            return "aead_limit_reached";
-        case QUIC_ERR_NO_VIABLE_PATH:
-            return "no_viable_path";
-        default:
-            return NULL;
+    case OSSL_QUIC_ERR_INTERNAL_ERROR:
+        return "internal_error";
+    case OSSL_QUIC_ERR_CONNECTION_REFUSED:
+        return "connection_refused";
+    case OSSL_QUIC_ERR_FLOW_CONTROL_ERROR:
+        return "flow_control_error";
+    case OSSL_QUIC_ERR_STREAM_LIMIT_ERROR:
+        return "stream_limit_error";
+    case OSSL_QUIC_ERR_STREAM_STATE_ERROR:
+        return "stream_state_error";
+    case OSSL_QUIC_ERR_FINAL_SIZE_ERROR:
+        return "final_size_error";
+    case OSSL_QUIC_ERR_FRAME_ENCODING_ERROR:
+        return "frame_encoding_error";
+    case OSSL_QUIC_ERR_TRANSPORT_PARAMETER_ERROR:
+        return "transport_parameter_error";
+    case OSSL_QUIC_ERR_CONNECTION_ID_LIMIT_ERROR:
+        return "connection_id_limit_error";
+    case OSSL_QUIC_ERR_PROTOCOL_VIOLATION:
+        return "protocol_violation";
+    case OSSL_QUIC_ERR_INVALID_TOKEN:
+        return "invalid_token";
+    case OSSL_QUIC_ERR_APPLICATION_ERROR:
+        return "application_error";
+    case OSSL_QUIC_ERR_CRYPTO_BUFFER_EXCEEDED:
+        return "crypto_buffer_exceeded";
+    case OSSL_QUIC_ERR_KEY_UPDATE_ERROR:
+        return "key_update_error";
+    case OSSL_QUIC_ERR_AEAD_LIMIT_REACHED:
+        return "aead_limit_reached";
+    case OSSL_QUIC_ERR_NO_VIABLE_PATH:
+        return "no_viable_path";
+    default:
+        return NULL;
     }
 }
 #endif
@@ -128,8 +128,8 @@ void ossl_qlog_event_connectivity_connection_closed(QLOG *qlog,
             const char *m = quic_err_to_qlog(tcause->error_code);
             char ce[32];
 
-            if (tcause->error_code >= QUIC_ERR_CRYPTO_ERR_BEGIN
-                && tcause->error_code <= QUIC_ERR_CRYPTO_ERR_END) {
+            if (tcause->error_code >= OSSL_QUIC_ERR_CRYPTO_ERR_BEGIN
+                && tcause->error_code <= OSSL_QUIC_ERR_CRYPTO_ERR_END) {
                 BIO_snprintf(ce, sizeof(ce), "crypto_error_0x%03llx",
                              (unsigned long long)tcause->error_code);
                 m = ce;
@@ -151,20 +151,20 @@ void ossl_qlog_event_connectivity_connection_closed(QLOG *qlog,
 static const char *quic_pkt_type_to_qlog(uint32_t pkt_type)
 {
     switch (pkt_type) {
-        case QUIC_PKT_TYPE_INITIAL:
-            return "initial";
-        case QUIC_PKT_TYPE_HANDSHAKE:
-            return "handshake";
-        case QUIC_PKT_TYPE_0RTT:
-            return "0RTT";
-        case QUIC_PKT_TYPE_1RTT:
-            return "1RTT";
-        case QUIC_PKT_TYPE_VERSION_NEG:
-            return "version_negotiation";
-        case QUIC_PKT_TYPE_RETRY:
-            return "retry";
-        default:
-            return "unknown";
+    case QUIC_PKT_TYPE_INITIAL:
+        return "initial";
+    case QUIC_PKT_TYPE_HANDSHAKE:
+        return "handshake";
+    case QUIC_PKT_TYPE_0RTT:
+        return "0RTT";
+    case QUIC_PKT_TYPE_1RTT:
+        return "1RTT";
+    case QUIC_PKT_TYPE_VERSION_NEG:
+        return "version_negotiation";
+    case QUIC_PKT_TYPE_RETRY:
+        return "retry";
+    default:
+        return "unknown";
     }
 }
 #endif

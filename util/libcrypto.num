@@ -5540,9 +5540,11 @@ OSSL_CMP_CTX_get0_geninfo_ITAVs         ?	3_3_0	EXIST::FUNCTION:CMP
 OSSL_CMP_HDR_get0_geninfo_ITAVs         ?	3_3_0	EXIST::FUNCTION:CMP
 OSSL_CMP_ITAV_new0_certProfile          ?	3_3_0	EXIST::FUNCTION:CMP
 OSSL_CMP_ITAV_get0_certProfile          ?	3_3_0	EXIST::FUNCTION:CMP
+OSSL_CMP_MSG_get0_certreq_publickey     ?	3_3_0	EXIST::FUNCTION:CMP
 OSSL_CMP_SRV_CTX_init_trans             ?	3_3_0	EXIST::FUNCTION:CMP
 EVP_DigestSqueeze                       ?	3_3_0	EXIST::FUNCTION:
 ERR_pop                                 ?	3_3_0	EXIST::FUNCTION:
 X509_STORE_get1_objects                 ?	3_3_0	EXIST::FUNCTION:
 OPENSSL_LH_set_thunks                   ?	3_3_0	EXIST::FUNCTION:
 OPENSSL_LH_doall_arg_thunk              ?	3_3_0	EXIST::FUNCTION:
+OSSL_HTTP_REQ_CTX_set_max_response_hdr_lines ?	3_3_0	EXIST::FUNCTION:HTTP

@@ -165,6 +165,8 @@ static int opt_repeat = 1;
 static char *opt_reqin = NULL;
 static int opt_reqin_new_tid = 0;
 static char *opt_reqout = NULL;
+static char *opt_reqout_only = NULL;
+static int reqout_only_done = 0;
 static char *opt_rspin = NULL;
 static int rspin_in_use = 0;
 static char *opt_rspout = NULL;
@@ -255,7 +257,8 @@ typedef enum OPTION_choice {
 #endif
 
     OPT_BATCH, OPT_REPEAT,
-    OPT_REQIN, OPT_REQIN_NEW_TID, OPT_REQOUT, OPT_RSPIN, OPT_RSPOUT,
+    OPT_REQIN, OPT_REQIN_NEW_TID, OPT_REQOUT, OPT_REQOUT_ONLY,
+    OPT_RSPIN, OPT_RSPOUT,
     OPT_USE_MOCK_SRV,
 
 #if !defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_HTTP)
@@ -502,6 +505,8 @@ const OPTIONS cmp_options[] = {
      "Use fresh transactionID for CMP requests read from -reqin"},
     {"reqout", OPT_REQOUT, 's',
      "Save sequence of CMP requests created by the client to file(s)"},
+    {"reqout_only", OPT_REQOUT_ONLY, 's',
+     "Save first CMP request created by the client to file and exit"},
     {"rspin", OPT_RSPIN, 's',
      "Process sequence of CMP responses provided in file(s), skipping server"},
     {"rspout", OPT_RSPOUT, 's',
@@ -638,7 +643,7 @@ static varref cmp_vars[] = { /* must be in same order as enumerated above! */
 
     {(char **)&opt_batch}, {(char **)&opt_repeat},
     {&opt_reqin}, {(char **)&opt_reqin_new_tid},
-    {&opt_reqout}, {&opt_rspin}, {&opt_rspout},
+    {&opt_reqout}, {&opt_reqout_only}, {&opt_rspin}, {&opt_rspout},
 
     {(char **)&opt_use_mock_srv},
 #if !defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_HTTP)
@@ -814,6 +819,14 @@ static OSSL_CMP_MSG *read_write_req_resp(OSSL_CMP_CTX *ctx,
     OSSL_CMP_PKIHEADER *hdr;
     const char *prev_opt_rspin = opt_rspin;
 
+    if (opt_reqout_only != NULL) {
+        if (OSSL_CMP_MSG_write(opt_reqout_only, req) < 0)
+            CMP_err1("cannot write request PKIMessage to file '%s'",
+                     opt_reqout_only);
+        else
+            reqout_only_done = 1;
+        return NULL; /* stop at this point, not contacting any server */
+    }
     if (opt_reqout != NULL && !write_PKIMESSAGE(req, &opt_reqout))
         goto err;
     if (opt_reqin != NULL && opt_rspin == NULL) {
@@ -1130,7 +1143,7 @@ static OSSL_CMP_SRV_CTX *setup_srv_ctx(ENGINE *engine)
     if (!setup_cert(srv_ctx, opt_ref_cert, opt_otherpass,
                     "reference cert to be expected by the mock server",
                     (add_X509_fn_t)ossl_cmp_mock_srv_set1_refCert))
-            goto err;
+        goto err;
     if (opt_rsp_cert == NULL) {
         CMP_warn("no -rsp_cert given for mock server");
     } else {
@@ -1545,6 +1558,48 @@ static int setup_protection_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
     return 1;
 }
 
+static int set_fallback_pubkey(OSSL_CMP_CTX *ctx)
+{
+    char *file = opt_reqin, *end = file, bak;
+    OSSL_CMP_MSG *req;
+    const X509_PUBKEY *pubkey;
+    EVP_PKEY *pkey;
+    EVP_PKEY *pkey1;
+    int res = 0;
+
+    /* temporarily separate first file name in opt_reqin */
+    while (*end != ',' && !isspace(_UC(*end)) && *end != '\0')
+        end++;
+    bak = *end;
+    *end = '\0';
+    req = OSSL_CMP_MSG_read(file, app_get0_libctx(), app_get0_propq());
+    *end = bak;
+
+    if (req == NULL) {
+        CMP_err1("failed to load ir/cr/kur file '%s' attempting to get fallback public key",
+                 file);
+        return 0;
+    }
+    if ((pubkey = OSSL_CMP_MSG_get0_certreq_publickey(req)) == NULL
+        || (pkey = X509_PUBKEY_get0(pubkey)) == NULL) {
+        CMP_err1("failed to get fallback public key from ir/cr/kur file '%s'",
+                 file);
+        goto err;
+    }
+    pkey1 = EVP_PKEY_dup(pkey);
+    if (pkey == NULL || !OSSL_CMP_CTX_set0_newPkey(ctx, 0 /* priv */, pkey1)) {
+        EVP_PKEY_free(pkey1);
+        CMP_err1("failed to get fallback public key obtained from ir/cr/kur file '%s'",
+                 file);
+        goto err;
+    }
+    res = 1;
+
+ err:
+    OSSL_CMP_MSG_free(req);
+    return res;
+}
+
 /*
  * Set up IR/CR/P10CR/KUR/CertConf/RR/GENM specific parts of the OSSL_CMP_CTX
  * based on options from CLI and/or config file.
@@ -1564,26 +1619,28 @@ static int setup_request_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
     if (!set_name(opt_issuer, OSSL_CMP_CTX_set1_issuer, ctx, "issuer"))
         return 0;
     if (opt_cmd == CMP_IR || opt_cmd == CMP_CR || opt_cmd == CMP_KUR) {
-        if (opt_newkey == NULL
+        if (opt_reqin == NULL && opt_newkey == NULL
             && opt_key == NULL && opt_csr == NULL && opt_oldcert == NULL) {
-            CMP_err("missing -newkey (or -key) to be certified and no -csr, -oldcert, or -cert given for fallback public key");
+            CMP_err("missing -newkey (or -key) to be certified and no -csr, -oldcert, -cert, or -reqin option given, which could provide fallback public key");
             return 0;
         }
         if (opt_newkey == NULL
             && opt_popo != OSSL_CRMF_POPO_NONE
             && opt_popo != OSSL_CRMF_POPO_RAVERIFIED) {
             if (opt_csr != NULL) {
-                CMP_err1("no -newkey option given with private key for POPO, -csr option only provides public key%s",
-                        opt_key == NULL ? "" :
-                        ", and -key option superseded by -csr");
+                CMP_err1("no -newkey option given with private key for POPO, -csr option provides just public key%s",
+                         opt_key == NULL ? "" :
+                         ", and -key option superseded by -csr");
+                if (opt_reqin != NULL)
+                    CMP_info("since -reqin is used, may use -popo -1 or -popo 0 to disable the needless generation of a POPO");
                 return 0;
             }
             if (opt_key == NULL) {
-                CMP_err("missing -newkey (or -key) option for POPO");
+                CMP_err("missing -newkey (or -key) option for key to be certified and for POPO");
                 return 0;
             }
         }
-        if (opt_certout == NULL) {
+        if (opt_certout == NULL && opt_reqout_only == NULL) {
             CMP_err("-certout not given, nowhere to save newly enrolled certificate");
             return 0;
         }
@@ -1598,7 +1655,8 @@ static int setup_request_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
                 if (!set_name(opt_subject, OSSL_CMP_CTX_set1_subjectName, ctx, "subject"))
                     return 0;
             } else {
-                CMP_warn1("-subject %s since sender is taken from -ref or -cert", msg);
+                CMP_warn1("-subject %s since sender is taken from -ref or -cert",
+                          msg);
             }
         }
         if (opt_issuer != NULL && opt_cmd != CMP_RR)
@@ -1682,7 +1740,7 @@ static int setup_request_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
 
     if (opt_recipient == NULL && opt_srvcert == NULL && opt_issuer == NULL
             && opt_oldcert == NULL && opt_cert == NULL)
-        CMP_warn("missing -recipient, -srvcert, -issuer, -oldcert or -cert; recipient will be set to \"NULL-DN\"");
+        CMP_warn("missing -recipient, -srvcert, -issuer, -oldcert or -cert; recipient for any requests not covered by -reqin will be set to \"NULL-DN\"");
 
     if (opt_cmd == CMP_P10CR || opt_cmd == CMP_RR || opt_cmd == CMP_GENM) {
         const char *msg = "option is ignored for 'p10cr', 'rr', and 'genm' commands";
@@ -1722,6 +1780,10 @@ static int setup_request_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
             EVP_PKEY_free(pkey);
             return 0;
         }
+    } else if (opt_reqin != NULL
+               && opt_key == NULL && opt_csr == NULL && opt_oldcert == NULL) {
+        if (!set_fallback_pubkey(ctx))
+            return 0;
     }
 
     if (opt_days > 0
@@ -1814,7 +1876,6 @@ static int setup_request_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
         }
         opt_policy_oids = next;
     }
-
     if (opt_popo >= OSSL_CRMF_POPO_NONE)
         (void)OSSL_CMP_CTX_set_option(ctx, OSSL_CMP_OPT_POPO_METHOD, opt_popo);
 
@@ -1985,9 +2046,11 @@ static int setup_client_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
     char server_buf[200] = "mock server";
     char proxy_buf[200] = "";
 
+    if (!opt_use_mock_srv)
+        strcpy(server_buf, "no server");
     if (!opt_use_mock_srv && opt_rspin == NULL) { /* note: -port is not given */
 #if !defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_HTTP)
-        if (opt_server == NULL) {
+        if (opt_server == NULL && opt_reqout_only == NULL) {
             CMP_err("missing -server or -use_mock_srv or -rspin option");
             goto err;
         }
@@ -2151,12 +2214,10 @@ static int setup_client_ctx(OSSL_CMP_CTX *ctx, ENGINE *engine)
         goto err;
 
     /* not printing earlier, to minimize confusion in case setup fails before */
-    if (opt_rspin != NULL)
-        CMP_info2("will contact %s%s "
-                  "only if -rspin argument gives too few filenames",
-                  server_buf, proxy_buf);
-    else
-        CMP_info2("will contact %s%s", server_buf, proxy_buf);
+    if (opt_reqout_only == NULL)
+        CMP_info3("will contact %s%s%s ", server_buf, proxy_buf,
+                  opt_rspin == NULL ? "" :
+                  " only if -rspin argument gives too few filenames");
 
     ret = 1;
 
@@ -2796,6 +2857,9 @@ static int get_opts(int argc, char **argv)
         case OPT_REQOUT:
             opt_reqout = opt_str();
             break;
+        case OPT_REQOUT_ONLY:
+            opt_reqout_only = opt_str();
+            break;
         case OPT_RSPIN:
             opt_rspin = opt_str();
             break;
@@ -3105,25 +3169,17 @@ static int do_genm(OSSL_CMP_CTX *ctx)
     }
 }
 
-int cmp_main(int argc, char **argv)
+static int handle_opts_upfront(int argc, char **argv)
 {
-    char *configfile = NULL;
     int i;
-    X509 *newcert = NULL;
-    ENGINE *engine = NULL;
-    OSSL_CMP_CTX *srv_cmp_ctx = NULL;
-    int ret = 0; /* default: failure */
 
     prog = opt_appname(argv[0]);
     if (argc <= 1) {
         opt_help(cmp_options);
-        goto err;
+        return 0;
     }
 
-    /*
-     * handle options -config, -section, and -verbosity upfront
-     * to take effect for other options
-     */
+    /* handle -config, -section, and -verbosity to take effect for other opts */
     for (i = 1; i < argc - 1; i++) {
         if (*argv[i] == '-') {
             if (!strcmp(argv[i] + 1, cmp_options[OPT_CONFIG - OPT_HELP].name))
@@ -3134,11 +3190,25 @@ int cmp_main(int argc, char **argv)
             else if (strcmp(argv[i] + 1,
                             cmp_options[OPT_VERBOSITY - OPT_HELP].name) == 0
                      && !set_verbosity(atoi(argv[++i])))
-                goto err;
+                return 0;
         }
     }
     if (opt_section[0] == '\0') /* empty string */
         opt_section = DEFAULT_SECTION;
+    return 1;
+}
+
+int cmp_main(int argc, char **argv)
+{
+    char *configfile = NULL;
+    int i;
+    X509 *newcert = NULL;
+    ENGINE *engine = NULL;
+    OSSL_CMP_CTX *srv_cmp_ctx = NULL;
+    int ret = 0; /* default: failure */
+
+    if (!handle_opts_upfront(argc, argv))
+        goto err;
 
     vpm = X509_VERIFY_PARAM_new();
     if (vpm == NULL) {
@@ -3254,11 +3324,11 @@ int cmp_main(int argc, char **argv)
         (void)OSSL_CMP_CTX_set_option(cmp_ctx, OSSL_CMP_OPT_NO_CACHE_EXTRACERTS,
                                       1);
 
-    if (opt_use_mock_srv
+    if (opt_reqout_only == NULL && (opt_use_mock_srv
 #if !defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_HTTP)
-        || opt_port != NULL
+                                    || opt_port != NULL
 #endif
-        ) {
+                                    )) {
         OSSL_CMP_SRV_CTX *srv_ctx;
 
         if ((srv_ctx = setup_srv_ctx(engine)) == NULL)
@@ -3285,6 +3355,23 @@ int cmp_main(int argc, char **argv)
 
     /* act as CMP client, possibly using internal mock server */
 
+    if (opt_reqout_only != NULL) {
+        const char *msg = "option is ignored since -reqout_only option is given";
+
+#if !defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_HTTP)
+        if (opt_server != NULL)
+            CMP_warn1("-server %s", msg);
+#endif
+        if (opt_use_mock_srv)
+            CMP_warn1("-use_mock_srv %s", msg);
+        if (opt_reqout != NULL)
+            CMP_warn1("-reqout %s", msg);
+        if (opt_rspin != NULL)
+            CMP_warn1("-rspin %s", msg);
+        if (opt_rspout != NULL)
+            CMP_warn1("-rspout %s", msg);
+        opt_reqout = opt_reqout_only;
+    }
     if (opt_rspin != NULL) {
         if (opt_server != NULL)
             CMP_warn("-server option is not used if enough filenames given for -rspin");
@@ -3329,8 +3416,13 @@ int cmp_main(int argc, char **argv)
             break;
         }
         if (OSSL_CMP_CTX_get_status(cmp_ctx) < OSSL_CMP_PKISTATUS_accepted) {
+            /* we got no response, maybe even did not send request */
             ret = 0;
-            goto err; /* we got no response, maybe even did not send request */
+            if (reqout_only_done) {
+                ERR_clear_error();
+                ret = 1;
+            }
+            goto err;
         }
         print_status();
         if (!save_cert_or_delete(OSSL_CMP_CTX_get0_validatedSrvCert(cmp_ctx),

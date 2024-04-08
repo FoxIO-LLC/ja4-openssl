@@ -490,6 +490,27 @@ OSSL_ENCODER_Parameters_TO_PEM_PQ       define
 OSSL_ENCODER_PUBKEY_TO_TEXT_PQ          define
 OSSL_ENCODER_PrivateKey_TO_TEXT_PQ      define
 OSSL_ENCODER_Parameters_TO_TEXT_PQ      define
+OSSL_QUIC_ERR_NO_ERROR                  define
+OSSL_QUIC_ERR_INTERNAL_ERROR            define
+OSSL_QUIC_ERR_CONNECTION_REFUSED        define
+OSSL_QUIC_ERR_FLOW_CONTROL_ERROR        define
+OSSL_QUIC_ERR_STREAM_LIMIT_ERROR        define
+OSSL_QUIC_ERR_STREAM_STATE_ERROR        define
+OSSL_QUIC_ERR_FINAL_SIZE_ERROR          define
+OSSL_QUIC_ERR_FRAME_ENCODING_ERROR      define
+OSSL_QUIC_ERR_TRANSPORT_PARAMETER_ERROR define
+OSSL_QUIC_ERR_CONNECTION_ID_LIMIT_ERROR define
+OSSL_QUIC_ERR_PROTOCOL_VIOLATION        define
+OSSL_QUIC_ERR_INVALID_TOKEN             define
+OSSL_QUIC_ERR_APPLICATION_ERROR         define
+OSSL_QUIC_ERR_CRYPTO_BUFFER_EXCEEDED    define
+OSSL_QUIC_ERR_KEY_UPDATE_ERROR          define
+OSSL_QUIC_ERR_AEAD_LIMIT_REACHED        define
+OSSL_QUIC_ERR_NO_VIABLE_PATH            define
+OSSL_QUIC_ERR_CRYPTO_ERR_BEGIN          define
+OSSL_QUIC_ERR_CRYPTO_ERR_END            define
+OSSL_QUIC_ERR_CRYPTO_ERR                define
+OSSL_QUIC_LOCAL_ERR_IDLE_TIMEOUT        define
 PEM_FLAG_EAY_COMPATIBLE                 define
 PEM_FLAG_ONLY_B64                       define
 PEM_FLAG_SECURE                         define
@@ -666,6 +687,9 @@ SSL_get_quic_stream_uni_local_avail     define
 SSL_get_quic_stream_uni_remote_avail    define
 SSL_get_event_handling_mode             define
 SSL_set_event_handling_mode             define
+SSL_get_stream_write_buf_size           define
+SSL_get_stream_write_buf_used           define
+SSL_get_stream_write_buf_avail          define
 SSL_CONN_CLOSE_FLAG_LOCAL               define
 SSL_CONN_CLOSE_FLAG_TRANSPORT           define
 SSLv23_client_method                    define
@@ -731,6 +755,9 @@ SSL_VALUE_EVENT_HANDLING_MODE           define
 SSL_VALUE_EVENT_HANDLING_MODE_INHERIT   define
 SSL_VALUE_EVENT_HANDLING_MODE_IMPLICIT  define
 SSL_VALUE_EVENT_HANDLING_MODE_EXPLICIT  define
+SSL_VALUE_STREAM_WRITE_BUF_SIZE         define
+SSL_VALUE_STREAM_WRITE_BUF_USED         define
+SSL_VALUE_STREAM_WRITE_BUF_AVAIL        define
 TLS_DEFAULT_CIPHERSUITES                define deprecated 3.0.0
 X509_CRL_http_nbio                      define deprecated 3.0.0
 X509_http_nbio                          define deprecated 3.0.0
