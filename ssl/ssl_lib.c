@@ -6533,6 +6533,53 @@ size_t SSL_client_hello_get0_compression_methods(SSL *s, const unsigned char **o
     return sc->clienthello->compressions_len;
 }
 
+int SSL_client_hello_getall_extensions_present(SSL *s, int **out, size_t *outlen)
+{
+    const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(s);
+    PACKET extensions = sc->clienthello->extensions;
+    size_t num_extensions = 0;
+    // First pass: count extensions.
+    while (PACKET_remaining(&extensions) > 0) {
+        unsigned int type;
+        PACKET extension;
+        if (!PACKET_get_net_2(&extensions, &type) ||
+            !PACKET_get_length_prefixed_2(&extensions, &extension)) {
+            // Error handling.
+            return 0;
+        }
+        num_extensions++;
+    }
+
+    // Allocate array for extension types.
+    int *extension_types = OPENSSL_malloc(num_extensions * sizeof(int));
+    if (extension_types == NULL) {
+        // Memory allocation failed.
+        return 0;
+    }
+
+    // Reset the extensions packet for a second pass.
+    extensions = sc->clienthello->extensions;
+    size_t idx = 0;
+    // Second pass: collect extension types.
+    while (PACKET_remaining(&extensions) > 0 && idx < num_extensions) {
+        unsigned int type;
+        PACKET extension;
+        if (!PACKET_get_net_2(&extensions, &type) ||
+            !PACKET_get_length_prefixed_2(&extensions, &extension)) {
+            // Error handling. Free allocated memory to avoid leaks.
+            OPENSSL_free(extension_types);
+            return 0;
+        }
+        extension_types[idx++] = type;
+    }
+    *out = extension_types;
+    *outlen = num_extensions;
+    return 1;
+    err:
+    OPENSSL_free(extension_types);
+    return 0;
+}
+
 int SSL_client_hello_get1_extensions_present(SSL *s, int **out, size_t *outlen)
 {
     RAW_EXTENSION *ext;

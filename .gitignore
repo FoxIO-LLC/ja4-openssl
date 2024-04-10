@@ -1,3 +1,5 @@
+.openssl
+
 # Ignore editor artefacts
 /.dir-locals.el
 
